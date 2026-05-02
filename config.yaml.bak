@@ -1,0 +1,6 @@
+model_list:
+  - model_name: claude-sonnet-4-6  # 伪装成 Claude Code 想要的这个名字
+    litellm_params:
+      model: openai/local-model      # 告诉 litellm 使用 openai 兼容格式
+      api_base: "http://127.0.0.1:8080/v1" # 指向你本地的 llama.cpp 地址
+      api_key: "123"         # 本地测试随便填一个假 key 即可
