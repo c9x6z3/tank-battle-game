@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tank Battle</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: #333;
+            color: white;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        canvas {
+            background-color: #111;
+            border: 4px solid #555;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+        #ui {
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        .controls {
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #aaa;
+        }
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <h1>Tank Battle</h1>
+        <div id="score">Score: 0</div>
+    </div>
+    <div id="overlay">
+        <h2 id="overlay-text">GAME OVER</h2>
+        <button id="restart-btn" style="padding: 10px 20px; font-size: 1.2em; cursor: pointer;">Play Again</button>
+    </div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div class="controls">
+        Use Arrow Keys to move and Space to shoot.
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const overlay = document.getElementById('overlay');
+        const overlayText = document.getElementById('overlay-text');
+        const restartBtn = document.getElementById('restart-btn');
+
+        let score = 0;
+        let gameOver = false;
+
+        class Tank {
+            constructor(x, y, color, isPlayer = false) {
+                this.x = x;
+                this.y = y;
+                this.width = 30;
+                this.height = 30;
+                this.color = color;
+                this.isPlayer = isPlayer;
+                this.angle = isPlayer ? 0 : Math.PI;
+                this.speed = isPlayer ? 3 : 1.5;
+                this.rotationSpeed = 0.05;
+                this.lastShotTime = 0;
+                this.shootDelay = 500;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.angle);
+
+                // Body
+                ctx.fillStyle = this.color;
+                ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height);
+
+                // Turret
+                ctx.fillStyle = this.color;
+                ctx.fillRect(0, -5, 20, 10);
+                ctx.beginPath();
+                ctx.arc(0, 0, 10, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+            }
+
+            move(dir) {
+                if (this.isPlayer) {
+                    // Control logic handled in main loop
+                } else {
+                    // Simple AI
+                    this.angle += 0.02;
+                }
+            }
+
+            shoot() {
+                const now = Date.now();
+                if (now - this.lastShotTime > this.shootDelay) {
+                    const bulletSpeed = 7;
+                    bullets.push({
+                        x: this.x + Math.cos(this.angle) * 25,
+                        y: this.y + Math.sin(this.angle) * 25,
+                        vx: Math.cos(this.angle) * bulletSpeed,
+                        vy: Math.sin(this.angle) * bulletSpeed,
+                        radius: 4,
+                        color: this.color,
+                        isPlayer: this.isPlayer
+                    });
+                    this.lastShotTime = now;
+                }
+            }
+        }
+
+        let player = new Tank(canvas.width / 2, canvas.height / 2, '#0f0', true);
+        let enemies = [];
+        let bullets = [];
+        let particles = [];
+        let enemySpawnTimer = 0;
+
+        const keys = {};
+        window.addEventListener('keydown', e => keys[e.code] = true);
+        window.addEventListener('keyup', e => keys[e.code] = false);
+
+        function spawnEnemy() {
+            const side = Math.floor(Math.random() * 4);
+            let x, y;
+            if (side === 0) { x = Math.random() * canvas.width; y = -30; }
+            else if (side === 1) { x = canvas.width + 30; y = Math.random() * canvas.height; }
+            else if (side === 2) { x = Math.random() * canvas.width; y = canvas.height + 30; }
+            else { x = -30; y = Math.random() * canvas.height; }
+
+            enemies.push(new Tank(x, y, '#f00', false));
+        }
+
+        function createParticles(x, y, color) {
+            for (let i = 0; i < 8; i++) {
+                particles.push({
+                    x, y,
+                    vx: (Math.random() - 0.5) * 4,
+                    vy: (Math.random() - 0.5) * 4,
+                    radius: Math.random() * 3,
+                    life: 1.0,
+                    color
+                });
+            }
+        }
+
+        function update() {
+            if (gameOver) return;
+
+            // Player Movement
+            if (keys['ArrowLeft']) player.angle -= player.rotationSpeed;
+            if (keys['ArrowRight']) player.angle += player.rotationSpeed;
+            if (keys['ArrowUp']) {
+                player.x += Math.cos(player.angle) * player.speed;
+                player.y += Math.sin(player.angle) * player.speed;
+            }
+            if (keys['ArrowDown']) {
+                player.x -= Math.cos(player.angle) * player.speed;
+                player.y -= Math.sin(player.angle) * player.speed;
+            }
+            if (keys['Space']) player.shoot();
+
+            // Boundary check
+            player.x = Math.max(player.width/2, Math.min(canvas.width - player.width/2, player.x));
+            player.y = Math.max(player.height/2, Math.min(canvas.height - player.height/2, player.y));
+
+            // Update bullets
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const b = bullets[i];
+                b.x += b.vx;
+                b.y += b.vy;
+
+                if (b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height) {
+                    bullets.splice(i, 1);
+                    continue;
+                }
+
+                // Collision check: bullet vs enemy
+                if (b.isPlayer) {
+                    for (let j = enemies.length - 1; j >= 0; j--) {
+                        const e = enemies[j];
+                        const dist = Math.hypot(b.x - e.x, b.y - e.y);
+                        if (dist < 20) {
+                            createParticles(e.x, e.y, e.color);
+                            enemies.splice(j, 1);
+                            bullets.splice(i, 1);
+                            score += 100;
+                            scoreElement.innerText = `Score: ${score}`;
+                            break;
+                        }
+                    }
+                } else {
+                    // Collision check: enemy bullet vs player
+                    const dist = Math.hypot(b.x - player.x, b.y - player.y);
+                    if (dist < 20) {
+                        gameOver = true;
+                        overlay.style.display = 'flex';
+                    }
+                }
+            }
+
+            // Update enemies
+            enemySpawnTimer++;
+            if (enemySpawnTimer > 100) {
+                spawnEnemy();
+                enemySpawnTimer = 0;
+            }
+
+            enemies.forEach((e, idx) => {
+                const angleToPlayer = Math.atan2(player.y - e.y, player.x - e.x);
+                e.angle = angleToPlayer;
+
+                // Move towards player
+                e.x += Math.cos(e.angle) * e.speed;
+                e.y += Math.sin(e.angle) * e.speed;
+
+                // Shoot at player
+                if (Math.random() < 0.02) e.shoot();
+
+                // Collision check: enemy vs player
+                const dist = Math.hypot(e.x - player.x, e.y - player.y);
+                if (dist < 30) {
+                    gameOver = true;
+                    overlay.style.display = 'flex';
+                }
+            });
+
+            // Update particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 0.02;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw particles
+            particles.forEach(p => {
+                ctx.save();
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+
+            // Draw player
+            player.draw();
+
+            // Draw enemies
+            enemies.forEach(e => e.draw());
+
+            // Draw bullets
+            bullets.forEach(b => {
+                ctx.fillStyle = b.color;
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        restartBtn.addEventListener('click', () => {
+            score = 0;
+            scoreElement.innerText = `Score: ${score}`;
+            gameOver = false;
+            overlay.style.display = 'none';
+            player = new Tank(canvas.width / 2, canvas.height / 2, '#0f0', true);
+            enemies = [];
+            bullets = [];
+            particles = [];
+            enemySpawnTimer = 0;
+        });
+
+        gameLoop();
+    </script>
+</body>
+</html>
